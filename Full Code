@@ -1,0 +1,211 @@
+import React, { useState, useEffect } from 'react';
+
+const STORAGE_KEY = '_yourusername_recipes'; // Replace '_yourusername_recipes' with your prefix if desired
+
+function App() {
+  const [recipes, setRecipes] = useState([]);
+  const [currentView, setCurrentView] = useState('list'); // 'list', 'view', 'edit'
+  const [selectedRecipeId, setSelectedRecipeId] = useState(null);
+
+  // Load recipes from localStorage on initial render
+  useEffect(() => {
+    const storedRecipes = localStorage.getItem(STORAGE_KEY);
+    if (storedRecipes) {
+      setRecipes(JSON.parse(storedRecipes));
+    }
+  }, []);
+
+  // Save recipes to localStorage whenever recipes change
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(recipes));
+  }, [recipes]);
+
+  // Add a new recipe
+  const addRecipe = (recipe) => {
+    setRecipes([...recipes, { id: Date.now(), ...recipe }]);
+  };
+
+  // Delete a recipe
+  const deleteRecipe = (id) => {
+    setRecipes(recipes.filter(r => r.id !== id));
+    // If deleting the selected recipe, go back to list
+    if (selectedRecipeId === id) {
+      setCurrentView('list');
+      setSelectedRecipeId(null);
+    }
+  };
+
+  // View a recipe
+  const viewRecipe = (id) => {
+    setSelectedRecipeId(id);
+    setCurrentView('view');
+  };
+
+  // Edit a recipe
+  const editRecipe = (id, updatedRecipe) => {
+    setRecipes(recipes.map(r => r.id === id ? { ...r, ...updatedRecipe } : r));
+    setCurrentView('list');
+    setSelectedRecipeId(null);
+  };
+
+  const selectedRecipe = recipes.find(r => r.id === selectedRecipeId);
+
+  return (
+    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px', fontFamily: 'Arial, sans-serif' }}>
+      <h1 style={{ textAlign: 'center' }}>Recipe Box</h1>
+      
+      {currentView === 'list' && (
+        <>
+          <AddRecipeForm onAdd={addRecipe} />
+          <RecipeList 
+            recipes={recipes} 
+            onView={viewRecipe} 
+            onDelete={deleteRecipe} 
+          />
+        </>
+      )}
+
+      {currentView === 'view' && selectedRecipe && (
+        <Recipe 
+          recipe={selectedRecipe} 
+          onEdit={() => setCurrentView('edit')} 
+          onBack={() => setCurrentView('list')} 
+          onDelete={() => deleteRecipe(selectedRecipe.id)} 
+        />
+      )}
+
+      {currentView === 'edit' && selectedRecipe && (
+        <EditRecipeForm 
+          recipe={selectedRecipe} 
+          onSave={(updated) => editRecipe(selectedRecipe.id, updated)} 
+          onCancel={() => setCurrentView('view')} 
+        />
+      )}
+    </div>
+  );
+}
+
+// Component to add new recipes
+function AddRecipeForm({ onAdd }) {
+  const [name, setName] = useState('');
+  const [ingredients, setIngredients] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (name.trim() && ingredients.trim()) {
+      onAdd({ name: name.trim(), ingredients: ingredients.split(',').map(i => i.trim()) });
+      setName('');
+      setIngredients('');
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} style={{ marginBottom: '20px', padding: '10px', border: '1px solid #ccc', borderRadius: '5px' }}>
+      <h2 style={{ marginBottom: '10px' }}>Add New Recipe</h2>
+      <div style={{ marginBottom: '10px' }}>
+        <input
+          type="text"
+          placeholder="Recipe Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+          style={{ width: '100%', padding: '8px', fontSize: '1em' }}
+        />
+      </div>
+      <div style={{ marginBottom: '10px' }}>
+        <input
+          type="text"
+          placeholder="Ingredients (comma separated)"
+          value={ingredients}
+          onChange={(e) => setIngredients(e.target.value)}
+          required
+          style={{ width: '100%', padding: '8px', fontSize: '1em' }}
+        />
+      </div>
+      <button type="submit" style={{ padding: '10px 20px', fontSize: '1em' }}>Add Recipe</button>
+    </form>
+  );
+}
+
+// List of recipes
+function RecipeList({ recipes, onView, onDelete }) {
+  if (recipes.length === 0) {
+    return <p style={{ textAlign: 'center' }}>No recipes added yet.</p>;
+  }
+
+  return (
+    <ul style={{ listStyle: 'none', padding: 0 }}>
+      {recipes.map(recipe => (
+        <li key={recipe.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', marginBottom: '8px' }}>
+          <span style={{ cursor: 'pointer', fontWeight: 'bold' }} onClick={() => onView(recipe.id)}>
+            {recipe.name}
+          </span>
+          <div>
+            <button onClick={() => onDelete(recipe.id)} style={{ marginRight: '10px', padding: '6px 12px' }}>Delete</button>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// View recipe details
+function Recipe({ recipe, onEdit, onBack, onDelete }) {
+  return (
+    <div style={{ padding: '10px', border: '1px solid #ccc', borderRadius: '5px' }}>
+      <h2>{recipe.name}</h2>
+      <h3>Ingredients:</h3>
+      <ul>
+        {recipe.ingredients.map((ing, index) => (
+          <li key={index}>{ing}</li>
+        ))}
+      </ul>
+      <div style={{ marginTop: '20px' }}>
+        <button onClick={onEdit} style={{ marginRight: '10px', padding: '8px 16px' }}>Edit</button>
+        <button onClick={onBack} style={{ marginRight: '10px', padding: '8px 16px' }}>Back</button>
+        <button onClick={onDelete} style={{ padding: '8px 16px', backgroundColor: '#e74c3c', color: '#fff', border: 'none', borderRadius: '4px' }}>Delete</button>
+      </div>
+    </div>
+  );
+}
+
+// Edit recipe form
+function EditRecipeForm({ recipe, onSave, onCancel }) {
+  const [name, setName] = useState(recipe.name);
+  const [ingredients, setIngredients] = useState(recipe.ingredients.join(', '));
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (name.trim() && ingredients.trim()) {
+      onSave({ name: name.trim(), ingredients: ingredients.split(',').map(i => i.trim()) });
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} style={{ marginTop: '20px', padding: '10px', border: '1px solid #ccc', borderRadius: '5px' }}>
+      <h2 style={{ marginBottom: '10px' }}>Edit Recipe</h2>
+      <div style={{ marginBottom: '10px' }}>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+          style={{ width: '100%', padding: '8px', fontSize: '1em' }}
+        />
+      </div>
+      <div style={{ marginBottom: '10px' }}>
+        <input
+          type="text"
+          value={ingredients}
+          onChange={(e) => setIngredients(e.target.value)}
+          required
+          style={{ width: '100%', padding: '8px', fontSize: '1em' }}
+        />
+      </div>
+      <button type="submit" style={{ padding: '10px 20px', marginRight: '10px' }}>Save</button>
+      <button onClick={onCancel} style={{ padding: '10px 20px' }}>Cancel</button>
+    </form>
+  );
+}
+
+export default App;
